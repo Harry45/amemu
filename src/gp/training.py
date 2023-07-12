@@ -42,13 +42,14 @@ def plot_loss(optim: dict, fname: str, save: bool = True):
     path = os.path.join("results", "loss")
     os.makedirs(path, exist_ok=True)
     plt.savefig(path + "/" + fname + ".pdf", bbox_inches="tight")
+    plt.savefig(path + "/" + fname + ".png", bbox_inches="tight")
     if save:
         plt.close()
     else:
         plt.show()
 
 
-def train_gps(nlhs: int, xtrans: bool, ytrans: bool, jitter: float = 1e-6) -> list:
+def train_gps(nlhs: int, jitter: float = 1e-6) -> list:
     """Train the Gaussian Processes and store them.
 
     Args:
@@ -66,7 +67,7 @@ def train_gps(nlhs: int, xtrans: bool, ytrans: bool, jitter: float = 1e-6) -> li
 
     ins = torch.from_numpy(inputs.values)
 
-    gps = list()
+    gps = []
 
     for i in range(CONFIG.NWAVE):
 
@@ -75,11 +76,11 @@ def train_gps(nlhs: int, xtrans: bool, ytrans: bool, jitter: float = 1e-6) -> li
         out = torch.from_numpy(outputs.iloc[:, i].values)
 
         # the GP module
-        gp_module = GaussianProcess(ins, out, jitter, xtrans, ytrans)
+        gp_module = GaussianProcess(ins, out, jitter)
 
         # perform the optimisation of the GP model
         opt = gp_module.optimisation(
-            torch.randn(6),
+            torch.randn(inputs.shape[1]+1),
             niter=CONFIG.NITER,
             lrate=CONFIG.LEARN_RATE,
             nrestart=CONFIG.NRESTART,
@@ -88,7 +89,7 @@ def train_gps(nlhs: int, xtrans: bool, ytrans: bool, jitter: float = 1e-6) -> li
         gps.append(gp_module)
 
         # plot and store the loss function of the GP model
-        plot_loss(opt, f"{str(nlhs)}/pk_linear_lhs_" + str(nlhs) + "_wave_" + str(i))
+        plot_loss(opt, "pk_linear_lhs_" + str(nlhs) + "_wave_" + str(i))
 
         # save the GP model
         path = "gps/" + str(nlhs)

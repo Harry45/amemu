@@ -6,13 +6,12 @@ Description: The zero mean Gaussian Process (noise-free implementation, otherwis
 of this is to also supply a noise covariance matrix)
 """
 
-from typing import Union, Tuple
+from typing import Tuple
 import torch
 import torch.autograd
 import numpy as np
 import src.gp.kernel as kn
 import src.gp.transformation as tr
-
 
 class GaussianProcess(tr.PreWhiten):
     """Zero mean Gaussian Process
@@ -24,43 +23,49 @@ class GaussianProcess(tr.PreWhiten):
         xtrans (bool): whether to transform the inputs.
         ytrans (bool): whether to transform the outputs.
     """
-
-    def __init__(
-        self,
-        inputs: torch.tensor,
-        outputs: torch.tensor,
-        jitter: float,
-        xtrans: bool = True,
-        ytrans: bool = True,
-    ):
+    def __init__(self, inputs: torch.tensor, outputs: torch.tensor, jitter: float):
 
         # store the relevant informations
-        self.ytrain = outputs.view(-1, 1)
         self.jitter = jitter
-        self.xtrans = xtrans
-        self.ytrans = ytrans
 
         # get the dimensions of the inputs
         self.ndata, self.ndim = inputs.shape
-
-        assert (
-            self.ndata > self.ndim
-        ), "N < d, please reshape the inputs such that N > d."
-
-        if self.xtrans and self.ndim >= 2:
+        if self.ndim >= 2:
             tr.PreWhiten.__init__(self, inputs)
+        assert (self.ndata > self.ndim), "N < d, please reshape the inputs such that N > d."
+        self.xtrain, self.ytrain, self.ymean, self.ystd = self._postinit(inputs, outputs)
 
-            # transform the inputs
-            self.xtrain = tr.PreWhiten.x_transformation(self, inputs)
+        # store important quantities
+        self.d_opt = None
+        self.opt_parameters = None
+        self.kernel_matrix = None
+        self.alpha = None
 
+    def _postinit(self, inputs: torch.tensor,
+                  outputs: torch.tensor) -> Tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]:
+        """
+        Initialise the training points.
+
+        Args:
+            inputs (torch.tensor): the inputs to the GP.
+            outputs (torch.tensor): the target of the GP.
+
+        Returns:
+            Tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]: xtrain, ytrain, ymean and ystd
+        """
+
+        # transform the inputs
+        if self.ndim >= 2:
+            xtrain = tr.PreWhiten.x_transformation(self, inputs)
         else:
-            self.xtrain = inputs
+            xtrain = inputs
 
-        if self.ytrans:
-            ylog = torch.log(self.ytrain)
-            self.ymean = torch.mean(ylog)
-            self.ystd = torch.std(ylog)
-            self.ytrain = (ylog - self.ymean) / self.ystd
+        ylog = torch.log(outputs)
+        ymean = torch.mean(ylog)
+        ystd = torch.std(ylog)
+        ytrain = (ylog - ymean) / ystd
+        ytrain = ytrain.view(-1, 1)
+        return xtrain, ytrain, ymean, ystd
 
     def cost(self, parameters: torch.tensor) -> torch.tensor:
         """Calculates the negative log-likelihood of the GP, for fitting the kernel hyperparameters.
@@ -79,10 +84,7 @@ class GaussianProcess(tr.PreWhiten):
         kernel = kernel + torch.eye(self.xtrain.shape[0]) * self.jitter
 
         # compute the chi2 and log-determinant of the kernel matrix
-        log_marginal = -0.5 * self.ytrain.t() @ kn.solve(
-            kernel, self.ytrain
-        ) - 0.5 * kn.logdeterminant(kernel)
-
+        log_marginal = -0.5 * self.ytrain.t() @ kn.solve(kernel, self.ytrain) - 0.5 * kn.logdeterminant(kernel)
         return -log_marginal
 
     def optimisation(
@@ -126,11 +128,8 @@ class GaussianProcess(tr.PreWhiten):
 
             # run the optimisation
             for _ in range(niter):
-
                 optimiser.zero_grad()
-
                 loss.backward()
-
                 optimiser.step()
 
                 # evaluate the loss
@@ -160,7 +159,7 @@ class GaussianProcess(tr.PreWhiten):
         # return the optimised values of the hyperparameters and the loss
         return dictionary
 
-    def mean_prediction(self, testpoint: torch.tensor) -> torch.tensor:
+    def predict_mean(self, testpoint: torch.tensor) -> torch.tensor:
         """Calculates the mean prediction of the GP.
 
         Args:
@@ -169,57 +168,47 @@ class GaussianProcess(tr.PreWhiten):
         Returns:
             torch.tensor: the mean prediction from the GP
         """
-
         testpoint = testpoint.view(-1, 1)
-
-        if self.xtrans and self.ndim >= 2:
+        if self.ndim >= 2:
             testpoint = tr.PreWhiten.x_transformation(self, testpoint)
 
         k_star = kn.compute(self.xtrain, testpoint, self.opt_parameters.data)
-
         mean = k_star.t() @ self.alpha
+        mean = torch.exp(mean * self.ystd + self.ymean)
+        return mean.view(-1)
 
-        return mean
-
-    def derivatives(
-        self, testpoint: torch.tensor, order: int = 1
-    ) -> Union[Tuple[torch.tensor, torch.tensor], torch.tensor]:
-        """Calculates the derivatives of the GP.
+    def gradient(self, testpoint: torch.tensor) -> torch.tensor:
+        """Calculates the gradient of the GP.
 
         Args:
             testpoint(torch.tensor): the test point.
-            order(int, optional): the order of the differentiation. Defaults to 1.
-
-        Raises:
-            Exception: Only supports first and second derivatives.
 
         Returns:
-            Union[Tuple[torch.tensor, torch.tensor], torch.tensor]: the derivatives of the GP.
+            torch.tensor: the gradient of the GP with respect to the inputs
         """
 
         testpoint.requires_grad = True
+        mean = self.predict_mean(testpoint)
+        grad = torch.autograd.grad(mean, testpoint)[0]
+        testpoint.requires_grad = False
+        return grad
 
-        mean = self.mean_prediction(testpoint)
+    def hessian(self, testpoint: torch.tensor) -> torch.tensor:
+        """
+        Calculates the second derivatives of the GP with respect to the test point.
 
-        if self.ytrans:
-            mean = torch.exp(mean * self.ystd + self.ymean)
+        Args:
+            testpoint (torch.tensor): the input test point.
 
-        gradient = torch.autograd.grad(mean, testpoint)
+        Returns:
+            torch.tensor: the second derivatives
+        """
+        testpoint.requires_grad = True
+        hess = torch.autograd.functional.hessian(self.predict_mean, testpoint)
+        testpoint.requires_grad = False
+        return hess
 
-        if order == 1:
-            return gradient[0]
-
-        elif order == 2:
-            hessian = torch.autograd.functional.hessian(self.mean_prediction, testpoint)
-
-            return gradient[0], hessian
-
-        else:
-            raise Exception("The order of the derivative is not supported")
-
-    def prediction(
-        self, testpoint: torch.tensor, variance: bool = False
-    ) -> Union[Tuple[torch.tensor, torch.tensor], torch.tensor]:
+    def predict_mean_var(self, testpoint: torch.tensor) -> Tuple[torch.tensor, torch.tensor]:
         """Computes the prediction at a given test point.
 
         Args:
@@ -227,24 +216,25 @@ class GaussianProcess(tr.PreWhiten):
             variance(bool, optional): if we want to compute the variance as well. Defaults to False.
 
         Returns:
-            Union[Tuple[torch.tensor, torch.tensor], torch.tensor]: The mean and variance or mean only
+            Tuple[torch.tensor, torch.tensor]: The mean and variance
         """
-
         testpoint = testpoint.view(-1, 1)
-
-        if self.xtrans and self.ndim >= 2:
+        if self.ndim >= 2:
             testpoint = tr.PreWhiten.x_transformation(self, testpoint)
         k_star = kn.compute(self.xtrain, testpoint, self.opt_parameters.data)
+        k_star_star = kn.compute(testpoint, testpoint, self.opt_parameters.data)
+
+        # the mean prediction
         mean = k_star.t() @ self.alpha
+        mean = torch.exp(mean * self.ystd + self.ymean)
 
-        if self.ytrans:
-            mean = torch.exp(mean * self.ystd + self.ymean)
+        # the variance calculation
+        var = k_star_star - k_star.t() @ kn.solve(self.kernel_matrix, k_star)
+        var = (self.ystd * mean) ** 2 * var
+        return mean.view(-1), var.view(-1)
 
-        if variance:
-            k_star_star = kn.compute(testpoint, testpoint, self.opt_parameters.data)
-            var = k_star_star - k_star.t() @ kn.solve(self.kernel_matrix, k_star)
-            if self.ytrans:
-                var = (self.ystd * mean) ** 2 * var
-            return mean, var
-
-        return mean
+    def del_kernel(self):
+        """
+        Delete the kernel matrix for reducing storage size of GP.
+        """
+        del self.kernel_matrix

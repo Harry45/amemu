@@ -17,6 +17,12 @@ Z_MAX = 5.0
 K_MIN = 1e-4
 K_MAX = 50.0
 
+# fixed quantities for the power spectrum (k_pivot is from CLASS)
+FIX_K_PIVOT = 0.05
+FIX_SIGMA8 = 0.80
+FIX_NS = 1.0
+
+
 # CLASS output
 CLASS_ARGS = {
     "output": "mPk",
@@ -29,14 +35,12 @@ CLASS_ARGS = {
 NEUTRINO = {"N_ncdm": 1.0, "deg_ncdm": 3.0, "T_ncdm": 0.71611, "N_ur": 0.00641}
 
 # cosmological parameters (DES) - we include redshift as an input
-COSMO = ["Omega_cdm", "Omega_b", "sigma8", "n_s", "h", "z"]
+COSMO = ["Omega_cdm", "Omega_b", "h", "z"]
 
 # priors (DES)
 PRIORS = {
     "Omega_cdm": {"distribution": "uniform", "specs": [0.07, 0.43]},
     "Omega_b": {"distribution": "uniform", "specs": [0.028, 0.027]},
-    "sigma8": {"distribution": "uniform", "specs": [0.60, 0.40]},
-    "n_s": {"distribution": "uniform", "specs": [0.87, 0.20]},
     "h": {"distribution": "uniform", "specs": [0.64, 0.18]},
     "z": {"distribution": "uniform", "specs": [Z_MIN, Z_MAX]},
 }

@@ -93,24 +93,20 @@ def pk_linear(fname: str) -> Tuple[list, list]:
 
     # scale the LHS points to the cosmological parameters
     cosmologies = scale_lhs(fname, save=True)
-    # cosmologies = cosmologies[0:5]
 
     # class to compute the linear matter power spectrum
     module = PowerSpectrum(CONFIG.Z_MIN, CONFIG.Z_MAX, CONFIG.K_MIN, CONFIG.K_MAX)
-
+    fixed = {'sigma8': CONFIG.FIX_SIGMA8, 'n_s': CONFIG.FIX_NS}
     pk_lin = []
-    pk_nl = []
 
     for i, cosmoz in enumerate(cosmologies):
         redshift = cosmoz["z"]
         cosmoz.pop("z")
+        cosmoz = {**cosmoz, **fixed}
         print(i, cosmoz, redshift)
         pk_lin.append(module.pk_linear(cosmoz, redshift))
-        pk_nl.append(module.pk_nonlinear(cosmoz, redshift))
 
     # save the results to a csv file
     pk_lin_df = pd.DataFrame(pk_lin)
-    pk_nl_df = pd.DataFrame(pk_nl)
     hp.save_csv(pk_lin_df, "data", "pk_linear_" + fname)
-    hp.save_csv(pk_nl_df, "data", "pk_nonlin_" + fname)
-    return cosmologies, pk_lin, pk_nl
+    return cosmologies, pk_lin
