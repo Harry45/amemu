@@ -4,9 +4,11 @@ Date: July 2023
 Email: arrykrish@gmail.com, a.mootoovaloo17@imperial.ac.uk, arrykrishna.mootoovaloo@physics
 Description: Prediction of the linear matter power spectrum using the GP emulator
 """
+import os
 from typing import Tuple, Union
 import torch
 import numpy as np
+from pathlib import Path
 
 # our scripts and functions
 from utils.helpers import load_list
@@ -25,9 +27,11 @@ def load_gps(nlhs: int = 500) -> list:
         list: a list of GPs.
     """
     gps = []
+    parent_path = Path(__file__).parents[0]
+    gp_path = os.path.join(parent_path, f"gps/{nlhs}")
     for i in range(CONFIG.NWAVE):
-        gp = load_list(f"gps/{nlhs}", f"pk_linear_lhs_{nlhs}_wave_{i}")
-        gps.append(gp)
+        gp_module = load_list(gp_path, f"pk_linear_lhs_{nlhs}_wave_{i}")
+        gps.append(gp_module)
     return gps
 
 
