@@ -1,8 +1,12 @@
 #!/usr/bin/env python
+import os
 from setuptools import setup
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
+
+with open('requirements.txt') as f:
+    required = f.read().splitlines()
 
 setup(
     name="amemu",
@@ -20,17 +24,6 @@ setup(
         "Programming Language :: Python :: 3.9",
     ],
     packages=["amemu"],
-    install_requires=[
-        "pandas",
-        "numpy",
-        "torch",
-        "matplotlib",
-        "notebook",
-        "scipy",
-        "fast-pt",
-        "swig",
-        "pyccl",
-        "classy",
-    ],
+    install_requires=required,
     python_requires=">=3.9",
 )

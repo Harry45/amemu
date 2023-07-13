@@ -8,9 +8,9 @@ import torch
 import matplotlib.pylab as plt
 
 # our script and functions
-from ..gp.gaussianprocess import GaussianProcess
-from ...utils.helpers import load_csv, save_list
-from ... import config as CONFIG
+from src.gp.gaussianprocess import GaussianProcess
+from utils.helpers import load_csv, save_list
+import config as CONFIG
 
 plt.rc("text", usetex=True)
 plt.rc("font", **{"family": "sans-serif", "serif": ["Palatino"]})

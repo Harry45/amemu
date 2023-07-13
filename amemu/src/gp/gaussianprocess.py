@@ -10,8 +10,8 @@ from typing import Tuple
 import torch
 import torch.autograd
 import numpy as np
-import amemu.src.gp.kernel as kn
-import amemu.src.gp.transformation as tr
+import src.gp.kernel as kn
+import src.gp.transformation as tr
 
 
 class GaussianProcess(tr.PreWhiten):

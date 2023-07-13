@@ -13,7 +13,7 @@ import numpy as np
 from classy import Class  # pylint: disable-msg=E0611
 
 # our scripts and functions
-from .. import config as CONFIG
+import config as CONFIG
 
 
 def class_compute(cosmology: dict):

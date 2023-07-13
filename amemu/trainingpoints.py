@@ -14,9 +14,9 @@ import scipy.stats
 import pandas as pd
 
 # our scripts and functions
-from .src.cosmology import PowerSpectrum
-from .utils.helpers import save_csv
-from . import config as CONFIG
+from src.cosmology import PowerSpectrum
+from utils.helpers import save_csv
+import config as CONFIG
 
 
 def generate_prior(dictionary: dict) -> dict:
