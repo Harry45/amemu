@@ -1,6 +1,5 @@
 # our files/folders to ignore
 .ipynb_checkpoints
-gps/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
