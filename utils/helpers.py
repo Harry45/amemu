@@ -8,6 +8,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import torch
+import scipy.interpolate as itp
 
 
 def tensor_to_dict(tensor: torch.tensor, keys: list) -> dict:
@@ -165,37 +166,17 @@ def load_list(folder_name: str, file_name: str) -> list:
     return list_to_read
 
 
-def emcee_chains(folder_name: str, file_name: str, save=True) -> np.ndarray:
-    """Reads the emcee chains from a folder.
+def interpolate(inputs: list) -> np.ndarray:
+    """
+    Interpolate a 1D function. Note that the interpolation is done in log-space for both axes.
 
     Args:
-        folder_name (str): The name of the folder.
-        file_name (str): The name of the file.
+        inputs (list): [x, y, xnew]
 
     Returns:
-        np.ndarray: The array.
+        np.ndarray: the interpolated function.
     """
-
-    # the pkl file
-    pkl_file = load_list(folder_name, file_name)
-
-    # the MCMC samples
-    array = pkl_file.flatchain
-
-    # number of samples
-    nsamples = array.shape[0]
-
-    # the log-posterior
-    logp = pkl_file.flatlnprobability.reshape(nsamples, 1)
-
-    # the samples are unique - so we add a column of ones in the beginning
-    ones = np.ones((nsamples, 1))
-
-    # combine the important information
-    comb = np.concatenate([ones, logp, array], axis=1)
-
-    # save the array if required
-    if save:
-        np.savetxt(folder_name + "/" + "MCE_" + file_name, comb)
-
-    return comb
+    x, y, xnew = np.log(inputs[0]), np.log(inputs[1]), np.log(inputs[2])
+    spline = itp.splrep(x, y)
+    ynew = itp.splev(xnew, spline)
+    return np.exp(ynew)
