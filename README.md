@@ -11,6 +11,8 @@ Accelerating the computation of two-point statistics is an important research ar
 The inputs to the emulator are the cosmological parameters and redshift.
 
 ```
+conda create --name amemu python=3.9
+conda activate amemu
 pip install numpy
 pip install scipy
 pip install matplotlib
@@ -21,4 +23,5 @@ pip install fast-pt
 pip install swig
 pip install pyccl
 pip install classy
+pip install .
 ```

@@ -9,9 +9,9 @@ import torch
 import numpy as np
 
 # our scripts and functions
-from utils.helpers import load_list
-from trainingpoints import generate_prior
-import config as CONFIG
+from .utils.helpers import load_list
+from .trainingpoints import generate_prior
+from . import config as CONFIG
 
 
 def load_gps(nlhs: int = 500) -> list:

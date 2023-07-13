@@ -14,9 +14,9 @@ import scipy.stats
 import pandas as pd
 
 # our scripts and functions
-from src.cosmology import PowerSpectrum
-import utils.helpers as hp
-import config as CONFIG
+from .src.cosmology import PowerSpectrum
+from .utils.helpers import save_csv
+from . import config as CONFIG
 
 
 def generate_prior(dictionary: dict) -> dict:
@@ -66,17 +66,14 @@ def scale_lhs(fname: str = "lhs_500", save: bool = True) -> list:
         cosmo = lhs.iloc[i, :]
 
         # scale the cosmological parameters
-        cosmo = {
-            CONFIG.COSMO[k]: priors[CONFIG.COSMO[k]].ppf(cosmo[k])
-            for k in range(len(CONFIG.COSMO))
-        }
+        cosmo = {CONFIG.COSMO[k]: priors[CONFIG.COSMO[k]].ppf(cosmo[k]) for k in range(len(CONFIG.COSMO))}
 
         # append to the list
         cosmo_list.append(cosmo)
 
     if save:
         cosmos_df = pd.DataFrame(cosmo_list)
-        hp.save_csv(cosmos_df, "data", "cosmologies_" + fname)
+        save_csv(cosmos_df, "data", "cosmologies_" + fname)
     return cosmo_list
 
 
@@ -96,7 +93,7 @@ def pk_linear(fname: str) -> Tuple[list, list]:
 
     # class to compute the linear matter power spectrum
     module = PowerSpectrum(CONFIG.Z_MIN, CONFIG.Z_MAX, CONFIG.K_MIN, CONFIG.K_MAX)
-    fixed = {'sigma8': CONFIG.FIX_SIGMA8, 'n_s': CONFIG.FIX_NS}
+    fixed = {"sigma8": CONFIG.FIX_SIGMA8, "n_s": CONFIG.FIX_NS}
     pk_lin = []
 
     for i, cosmoz in enumerate(cosmologies):
@@ -108,5 +105,5 @@ def pk_linear(fname: str) -> Tuple[list, list]:
 
     # save the results to a csv file
     pk_lin_df = pd.DataFrame(pk_lin)
-    hp.save_csv(pk_lin_df, "data", "pk_linear_" + fname)
+    save_csv(pk_lin_df, "data", "pk_linear_" + fname)
     return cosmologies, pk_lin

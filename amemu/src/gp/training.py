@@ -8,9 +8,9 @@ import torch
 import matplotlib.pylab as plt
 
 # our script and functions
-from src.gp.gaussianprocess import GaussianProcess
-import utils.helpers as hp
-import config as CONFIG
+from ..gp.gaussianprocess import GaussianProcess
+from ...utils.helpers import load_csv, save_list
+from ... import config as CONFIG
 
 plt.rc("text", usetex=True)
 plt.rc("font", **{"family": "sans-serif", "serif": ["Palatino"]})
@@ -62,15 +62,14 @@ def train_gps(nlhs: int, jitter: float = 1e-6) -> list:
         list: A list of Gaussian Processes.
     """
 
-    inputs = hp.load_csv("data", "cosmologies_lhs_" + str(nlhs))
-    outputs = hp.load_csv("data", "pk_linear_lhs_" + str(nlhs))
+    inputs = load_csv("data", "cosmologies_lhs_" + str(nlhs))
+    outputs = load_csv("data", "pk_linear_lhs_" + str(nlhs))
 
     ins = torch.from_numpy(inputs.values)
 
     gps = []
 
     for i in range(CONFIG.NWAVE):
-
         print(f"Training GP {i + 1}")
 
         out = torch.from_numpy(outputs.iloc[:, i].values)
@@ -80,7 +79,7 @@ def train_gps(nlhs: int, jitter: float = 1e-6) -> list:
 
         # perform the optimisation of the GP model
         opt = gp_module.optimisation(
-            torch.randn(inputs.shape[1]+1),
+            torch.randn(inputs.shape[1] + 1),
             niter=CONFIG.NITER,
             lrate=CONFIG.LEARN_RATE,
             nrestart=CONFIG.NRESTART,
@@ -100,8 +99,8 @@ def train_gps(nlhs: int, jitter: float = 1e-6) -> list:
         pa_name = "params_" + str(nlhs) + "_wave_" + str(i)
         al_name = "alpha_" + str(nlhs) + "_wave_" + str(i)
 
-        hp.save_list(gp_module, path, gp_name)
-        hp.save_list(gp_module.opt_parameters.data.numpy(), path, pa_name)
-        hp.save_list(gp_module.alpha.data.numpy(), path, al_name)
+        save_list(gp_module, path, gp_name)
+        save_list(gp_module.opt_parameters.data.numpy(), path, pa_name)
+        save_list(gp_module.alpha.data.numpy(), path, al_name)
 
     return gps

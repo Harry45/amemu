@@ -13,7 +13,7 @@ import numpy as np
 from classy import Class  # pylint: disable-msg=E0611
 
 # our scripts and functions
-import config as CONFIG
+from .. import config as CONFIG
 
 
 def class_compute(cosmology: dict):
@@ -75,9 +75,7 @@ class PowerSpectrum:
     k_max: float = field(default=1.0, metadata={"unit": "1/Mpc"})
 
     def __post_init__(self):
-        self.wavenumber = np.geomspace(
-            self.k_min, self.k_max, CONFIG.NWAVE, endpoint=True
-        )
+        self.wavenumber = np.geomspace(self.k_min, self.k_max, CONFIG.NWAVE, endpoint=True)
 
     def pk_linear(self, cosmology: dict, redshift: float = 0.0) -> np.ndarray:
         """Calculates the linear matter power spectrum at a fixed redshift.

@@ -10,8 +10,9 @@ from typing import Tuple
 import torch
 import torch.autograd
 import numpy as np
-import src.gp.kernel as kn
-import src.gp.transformation as tr
+import amemu.src.gp.kernel as kn
+import amemu.src.gp.transformation as tr
+
 
 class GaussianProcess(tr.PreWhiten):
     """Zero mean Gaussian Process
@@ -23,8 +24,8 @@ class GaussianProcess(tr.PreWhiten):
         xtrans (bool): whether to transform the inputs.
         ytrans (bool): whether to transform the outputs.
     """
-    def __init__(self, inputs: torch.tensor, outputs: torch.tensor, jitter: float):
 
+    def __init__(self, inputs: torch.tensor, outputs: torch.tensor, jitter: float):
         # store the relevant informations
         self.jitter = jitter
 
@@ -32,7 +33,7 @@ class GaussianProcess(tr.PreWhiten):
         self.ndata, self.ndim = inputs.shape
         if self.ndim >= 2:
             tr.PreWhiten.__init__(self, inputs)
-        assert (self.ndata > self.ndim), "N < d, please reshape the inputs such that N > d."
+        assert self.ndata > self.ndim, "N < d, please reshape the inputs such that N > d."
         self.xtrain, self.ytrain, self.ymean, self.ystd = self._postinit(inputs, outputs)
 
         # store important quantities
@@ -41,8 +42,9 @@ class GaussianProcess(tr.PreWhiten):
         self.kernel_matrix = None
         self.alpha = None
 
-    def _postinit(self, inputs: torch.tensor,
-                  outputs: torch.tensor) -> Tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]:
+    def _postinit(
+        self, inputs: torch.tensor, outputs: torch.tensor
+    ) -> Tuple[torch.tensor, torch.tensor, torch.tensor, torch.tensor]:
         """
         Initialise the training points.
 
@@ -109,11 +111,8 @@ class GaussianProcess(tr.PreWhiten):
         dictionary = {}
 
         for i in range(nrestart):
-
             # make a copy of the original parameters and perturb it
-            params = torch.randn(
-                parameters.shape
-            )  # parameters.clone() + torch.randn(parameters.shape) * 0.1
+            params = torch.randn(parameters.shape)  # parameters.clone() + torch.randn(parameters.shape) * 0.1
 
             # make sure we are differentiating with respect to the parameters
             params.requires_grad = True
@@ -141,17 +140,13 @@ class GaussianProcess(tr.PreWhiten):
             dictionary[i] = {"parameters": params, "loss": record_loss}
 
         # get the dictionary for which the loss is the lowest
-        self.d_opt = dictionary[
-            np.argmin([dictionary[i]["loss"][-1] for i in range(nrestart)])
-        ]
+        self.d_opt = dictionary[np.argmin([dictionary[i]["loss"][-1] for i in range(nrestart)])]
 
         # store the optimised parameters as well
         self.opt_parameters = self.d_opt["parameters"]
 
         # compute the kernel and store it
-        self.kernel_matrix = kn.compute(
-            self.xtrain, self.xtrain, self.opt_parameters.data
-        )
+        self.kernel_matrix = kn.compute(self.xtrain, self.xtrain, self.opt_parameters.data)
 
         # also compute K^-1 y and store it
         self.alpha = kn.solve(self.kernel_matrix, self.ytrain)
