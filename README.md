@@ -29,8 +29,3 @@ pip install -i https://test.pypi.org/simple/ amemu==0.0.18
 
 ## Example
 Use the example notebook: `final.ipynb` as a test.
-
-```
-cd amemu/amemu/notebook
-jupyter notebook
-```
