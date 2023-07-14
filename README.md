@@ -16,7 +16,7 @@ conda create --name amemu python=3.9
 conda activate amemu
 git clone https://github.com/Harry45/amemu.git
 pip install -r requirements.txt
-pip install -i https://test.pypi.org/simple/ amemu==0.0.17
+pip install -i https://test.pypi.org/simple/ amemu==0.0.18
 ```
 
 ## Example
