@@ -7,8 +7,9 @@ import torch
 
 
 class PreWhiten(object):
-
     def __init__(self, xinputs: torch.tensor):
+        # number of dimensions
+        self.ndim = xinputs.shape[1]
 
         # compute the covariance of the inputs (ndim x ndim)
         self.cov_train = torch.cov(xinputs.t())

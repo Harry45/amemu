@@ -49,3 +49,6 @@ PRIORS = {
 LEARN_RATE = 1e-2
 NRESTART = 2
 NITER = 1000
+
+# URL where the models are stored
+MODEL_LINK = "http://dl.dropboxusercontent.com/s/2yojoa9wcn2m5wk/emulin-gps.tar?dl=0"

@@ -6,29 +6,59 @@ Description: Prediction of the linear matter power spectrum using the GP emulato
 """
 import os
 from typing import Tuple, Union
+from pathlib import Path
+import urllib.request
+import shutil
+import tarfile
 import torch
 import numpy as np
-from pathlib import Path
 
 # our scripts and functions
-from utils.helpers import load_list
-from trainingpoints import generate_prior
-import config as CONFIG
+from amemu.utils.helpers import load_list, MyProgressBar
+from amemu.trainingpoints import generate_prior
+import amemu.config as CONFIG
 
 
-def load_gps(nlhs: int = 500) -> list:
+def download_pre_trained_model(link: str):
+    """
+    Download all pre-trained models from a given link.
+
+    Args:
+        link (str): the link where the models are stored.
+    """
+    parent_path = Path(__file__).parents[0]
+    emulator_name = "linear-pk-emulator.tar"
+    urllib.request.urlretrieve(link, emulator_name, MyProgressBar())
+    tar_file = tarfile.open(emulator_name, "r")
+    tar_file.extractall(path=parent_path)
+    tar_file.close()
+    if os.path.isfile(emulator_name):
+        os.remove(emulator_name)
+
+
+def load_gps(nlhs: int = 500, download_link: str = None, download: bool = True) -> list:
     """
     Load the pre-trained GPs based on the number of LH used.
 
     Args:
         nlhs (int, optional): The number of LH points. Defaults to 500.
+        download_link (str): link where the GPs are stored
 
     Returns:
         list: a list of GPs.
     """
+
     gps = []
     parent_path = Path(__file__).parents[0]
     gp_path = os.path.join(parent_path, f"gps/{nlhs}")
+
+    if download:
+        if os.path.exists(gp_path):
+            print("Removing old pre-trained models.")
+            shutil.rmtree(gp_path)
+        print("Now downloading latest pre-trained models.")
+        download_pre_trained_model(download_link)
+
     for i in range(CONFIG.NWAVE):
         gp_module = load_list(gp_path, f"pk_linear_lhs_{nlhs}_wave_{i}")
         gps.append(gp_module)
@@ -48,7 +78,7 @@ def generate_cosmo_prior() -> dict:
     return priors
 
 
-class emuPredict(object):
+class EmuPredict:
     """
     Predicts the linear matter power spectrum using the GP emulator.
 
@@ -56,11 +86,13 @@ class emuPredict(object):
         nlhs (int, optional): The number of Latin Hypercube samples used. Defaults to 500.
     """
 
-    def __init__(self, nlhs: int = 500):
+    def __init__(self, nlhs: int = 500, download: bool = True):
         self.config = CONFIG
         self.priors = generate_cosmo_prior()
-        self.gps = load_gps(nlhs)
-        self.wavenumber = torch.logspace(np.log10(self.config.K_MIN), np.log10(self.config.K_MAX), self.config.NWAVE)
+        self.gps = load_gps(nlhs, CONFIG.MODEL_LINK, download)
+        self.wavenumber = torch.logspace(
+            np.log10(self.config.K_MIN), np.log10(self.config.K_MAX), self.config.NWAVE
+        )
 
     def check_prior(self, redshift: float, parameter: dict) -> None:
         """
@@ -71,8 +103,8 @@ class emuPredict(object):
             parameter (dict): the cosmological parameter.
         """
         logprior = 0.0
-        for p in ["Omega_cdm", "Omega_b", "h"]:
-            logprior += self.priors[p].logpdf(parameter[p])
+        for name in ["Omega_cdm", "Omega_b", "h"]:
+            logprior += self.priors[name].logpdf(parameter[name])
         logprior += self.priors["z"].logpdf(redshift)
         if not np.isfinite(logprior):
             print("Parameter is outside prior box. Unreliable predictions expected.")
@@ -88,7 +120,9 @@ class emuPredict(object):
             torch.tensor: the prefactor, the term containing sigma8 and n_s.
         """
         pre_sigma8 = (parameter[0] / self.config.FIX_SIGMA8) ** 2
-        pre_ns = (self.wavenumber / self.config.FIX_K_PIVOT) ** (parameter[1] - self.config.FIX_NS)
+        pre_ns = (self.wavenumber / self.config.FIX_K_PIVOT) ** (
+            parameter[1] - self.config.FIX_NS
+        )
         prefactor = pre_sigma8 * pre_ns
         return prefactor
 
@@ -108,11 +142,20 @@ class emuPredict(object):
             torch.tensor: the predicted mean of the GP.
         """
         self.check_prior(redshift, parameter)
-        param = torch.tensor([parameter["Omega_cdm"], parameter["Omega_b"], parameter["h"], redshift])
-        pred = torch.tensor([self.gps[i].predict_mean(param).data[0].item() for i in range(self.config.NWAVE)])
+        param = torch.tensor(
+            [parameter["Omega_cdm"], parameter["Omega_b"], parameter["h"], redshift]
+        )
+        pred = torch.tensor(
+            [
+                self.gps[i].predict_mean(param).data[0].item()
+                for i in range(self.config.NWAVE)
+            ]
+        )
         return pred
 
-    def calculate_gp_mean_var(self, redshift: float, parameter: dict) -> Tuple[torch.tensor, torch.tensor]:
+    def calculate_gp_mean_var(
+        self, redshift: float, parameter: dict
+    ) -> Tuple[torch.tensor, torch.tensor]:
         """
         Calculate BOTH the mean and the variance using the GP. Note that the GP is built on top of:
         1) redshift
@@ -128,7 +171,9 @@ class emuPredict(object):
             Tuple[torch.tensor, torch.tensor]: the GP mean and variance of the power spectrum
         """
         self.check_prior(redshift, parameter)
-        param = torch.tensor([parameter["Omega_cdm"], parameter["Omega_b"], parameter["h"], redshift])
+        param = torch.tensor(
+            [parameter["Omega_cdm"], parameter["Omega_b"], parameter["h"], redshift]
+        )
         preds = [self.gps[i].predict_mean_var(param) for i in range(self.config.NWAVE)]
         preds = list(map(torch.stack, zip(*preds)))
         gp_mean, gp_var = preds[0].view(-1), preds[1].view(-1)
@@ -148,7 +193,11 @@ class emuPredict(object):
         Returns:
             Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]: mean or (mean and variance) of the linear Pk.
         """
-        gp_cosmo = {"Omega_cdm": cosmo["Omega_cdm"], "Omega_b": cosmo["Omega_b"], "h": cosmo["h"]}
+        gp_cosmo = {
+            "Omega_cdm": cosmo["Omega_cdm"],
+            "Omega_b": cosmo["Omega_b"],
+            "h": cosmo["h"],
+        }
 
         # extra parameters
         pre_param = torch.tensor([cosmo["sigma8"], cosmo["n_s"]])

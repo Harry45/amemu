@@ -14,9 +14,9 @@ import scipy.stats
 import pandas as pd
 
 # our scripts and functions
-from src.cosmology import PowerSpectrum
-from utils.helpers import save_csv
-import config as CONFIG
+from amemu.src.cosmology import PowerSpectrum
+from amemu.utils.helpers import save_csv
+import amemu.config as CONFIG
 
 
 def generate_prior(dictionary: dict) -> dict:
@@ -66,7 +66,10 @@ def scale_lhs(fname: str = "lhs_500", save: bool = True) -> list:
         cosmo = lhs.iloc[i, :]
 
         # scale the cosmological parameters
-        cosmo = {CONFIG.COSMO[k]: priors[CONFIG.COSMO[k]].ppf(cosmo[k]) for k in range(len(CONFIG.COSMO))}
+        cosmo = {
+            CONFIG.COSMO[k]: priors[CONFIG.COSMO[k]].ppf(cosmo[k])
+            for k in range(len(CONFIG.COSMO))
+        }
 
         # append to the list
         cosmo_list.append(cosmo)

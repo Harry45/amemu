@@ -4,18 +4,18 @@
 # Description: In this code, we train the GP model using the training data.
 
 import os
+from pathlib import Path
 import torch
 import matplotlib.pylab as plt
 
 # our script and functions
-from src.gp.gaussianprocess import GaussianProcess
-from utils.helpers import load_csv, save_list
-import config as CONFIG
+from amemu.src.gp.gaussianprocess import GaussianProcess
+from amemu.utils.helpers import load_csv, save_list
+import amemu.config as CONFIG
 
 plt.rc("text", usetex=True)
 plt.rc("font", **{"family": "sans-serif", "serif": ["Palatino"]})
-figSize = (12, 8)
-fontSize = 20
+FONTSIZE = 20
 
 
 def plot_loss(optim: dict, fname: str, save: bool = True):
@@ -33,16 +33,13 @@ def plot_loss(optim: dict, fname: str, save: bool = True):
     plt.figure(figsize=(8, 8))
     for i in range(nopt):
         plt.plot(range(niter), optim[i]["loss"], label=f"Optimization {i + 1}")
-    plt.xlabel("Iterations", fontsize=fontSize)
-    plt.ylabel("Loss", fontsize=fontSize)
-    plt.tick_params(axis="x", labelsize=fontSize)
-    plt.tick_params(axis="y", labelsize=fontSize)
+    plt.xlabel("Iterations", fontsize=FONTSIZE)
+    plt.ylabel("Loss", fontsize=FONTSIZE)
+    plt.tick_params(axis="x", labelsize=FONTSIZE)
+    plt.tick_params(axis="y", labelsize=FONTSIZE)
     plt.legend(loc="best", prop={"family": "sans-serif", "size": 15})
-
-    path = os.path.join("results", "loss")
-    os.makedirs(path, exist_ok=True)
-    plt.savefig(path + "/" + fname + ".pdf", bbox_inches="tight")
-    plt.savefig(path + "/" + fname + ".png", bbox_inches="tight")
+    plt.savefig(fname + ".pdf", bbox_inches="tight")
+    plt.savefig(fname + ".png", bbox_inches="tight")
     if save:
         plt.close()
     else:
@@ -61,10 +58,16 @@ def train_gps(nlhs: int, jitter: float = 1e-6) -> list:
     Returns:
         list: A list of Gaussian Processes.
     """
+    # paths for the data, GP and loss
+    parent_path = Path(__file__).parents[2]
+    data_path = os.path.join(parent_path, "data")
+    gp_path = os.path.join(parent_path, f"gps/{nlhs}")
+    plot_path = os.path.join(parent_path, "results/loss")
+    os.makedirs(gp_path, exist_ok=True)
+    os.makedirs(plot_path, exist_ok=True)
 
-    inputs = load_csv("data", "cosmologies_lhs_" + str(nlhs))
-    outputs = load_csv("data", "pk_linear_lhs_" + str(nlhs))
-
+    inputs = load_csv(data_path, "cosmologies_lhs_" + str(nlhs))
+    outputs = load_csv(data_path, "pk_linear_lhs_" + str(nlhs))
     ins = torch.from_numpy(inputs.values)
 
     gps = []
@@ -88,19 +91,14 @@ def train_gps(nlhs: int, jitter: float = 1e-6) -> list:
         gps.append(gp_module)
 
         # plot and store the loss function of the GP model
-        plot_loss(opt, "pk_linear_lhs_" + str(nlhs) + "_wave_" + str(i))
-
-        # save the GP model
-        path = "gps/" + str(nlhs)
-        os.makedirs(path, exist_ok=True)
+        plot_loss(opt, f"{plot_path}/pk_linear_lhs_" + str(nlhs) + "_wave_" + str(i))
 
         # name of the files to save
         gp_name = "pk_linear_lhs_" + str(nlhs) + "_wave_" + str(i)
         pa_name = "params_" + str(nlhs) + "_wave_" + str(i)
         al_name = "alpha_" + str(nlhs) + "_wave_" + str(i)
 
-        save_list(gp_module, path, gp_name)
-        save_list(gp_module.opt_parameters.data.numpy(), path, pa_name)
-        save_list(gp_module.alpha.data.numpy(), path, al_name)
-
+        save_list(gp_module, gp_path, gp_name)
+        save_list(gp_module.opt_parameters.data.numpy(), gp_path, pa_name)
+        save_list(gp_module.alpha.data.numpy(), gp_path, al_name)
     return gps

@@ -10,11 +10,13 @@ from typing import Tuple
 import torch
 import torch.autograd
 import numpy as np
-import src.gp.kernel as kn
-import src.gp.transformation as tr
+
+# our scripts and functions
+from amemu.src.gp.kernel import logdeterminant, compute, solve
+from amemu.src.gp.transformation import PreWhiten
 
 
-class GaussianProcess(tr.PreWhiten):
+class GaussianProcess(PreWhiten):
     """Zero mean Gaussian Process
 
     Args:
@@ -32,9 +34,13 @@ class GaussianProcess(tr.PreWhiten):
         # get the dimensions of the inputs
         self.ndata, self.ndim = inputs.shape
         if self.ndim >= 2:
-            tr.PreWhiten.__init__(self, inputs)
-        assert self.ndata > self.ndim, "N < d, please reshape the inputs such that N > d."
-        self.xtrain, self.ytrain, self.ymean, self.ystd = self._postinit(inputs, outputs)
+            PreWhiten.__init__(self, inputs)
+        assert (
+            self.ndata > self.ndim
+        ), "N < d, please reshape the inputs such that N > d."
+        self.xtrain, self.ytrain, self.ymean, self.ystd = self._postinit(
+            inputs, outputs
+        )
 
         # store important quantities
         self.d_opt = None
@@ -58,7 +64,7 @@ class GaussianProcess(tr.PreWhiten):
 
         # transform the inputs
         if self.ndim >= 2:
-            xtrain = tr.PreWhiten.x_transformation(self, inputs)
+            xtrain = PreWhiten.x_transformation(self, inputs)
         else:
             xtrain = inputs
 
@@ -80,13 +86,15 @@ class GaussianProcess(tr.PreWhiten):
         """
 
         # compute the kernel matrix
-        kernel = kn.compute(self.xtrain, self.xtrain, parameters)
+        kernel = compute(self.xtrain, self.xtrain, parameters)
 
         # add the jitter term to the kernel matrix
         kernel = kernel + torch.eye(self.xtrain.shape[0]) * self.jitter
 
         # compute the chi2 and log-determinant of the kernel matrix
-        log_marginal = -0.5 * self.ytrain.t() @ kn.solve(kernel, self.ytrain) - 0.5 * kn.logdeterminant(kernel)
+        log_marginal = -0.5 * self.ytrain.t() @ solve(
+            kernel, self.ytrain
+        ) - 0.5 * logdeterminant(kernel)
         return -log_marginal
 
     def optimisation(
@@ -112,7 +120,9 @@ class GaussianProcess(tr.PreWhiten):
 
         for i in range(nrestart):
             # make a copy of the original parameters and perturb it
-            params = torch.randn(parameters.shape)  # parameters.clone() + torch.randn(parameters.shape) * 0.1
+            params = torch.randn(
+                parameters.shape
+            )  # parameters.clone() + torch.randn(parameters.shape) * 0.1
 
             # make sure we are differentiating with respect to the parameters
             params.requires_grad = True
@@ -140,16 +150,18 @@ class GaussianProcess(tr.PreWhiten):
             dictionary[i] = {"parameters": params, "loss": record_loss}
 
         # get the dictionary for which the loss is the lowest
-        self.d_opt = dictionary[np.argmin([dictionary[i]["loss"][-1] for i in range(nrestart)])]
+        self.d_opt = dictionary[
+            np.argmin([dictionary[i]["loss"][-1] for i in range(nrestart)])
+        ]
 
         # store the optimised parameters as well
         self.opt_parameters = self.d_opt["parameters"]
 
         # compute the kernel and store it
-        self.kernel_matrix = kn.compute(self.xtrain, self.xtrain, self.opt_parameters.data)
+        self.kernel_matrix = compute(self.xtrain, self.xtrain, self.opt_parameters.data)
 
         # also compute K^-1 y and store it
-        self.alpha = kn.solve(self.kernel_matrix, self.ytrain)
+        self.alpha = solve(self.kernel_matrix, self.ytrain)
 
         # return the optimised values of the hyperparameters and the loss
         return dictionary
@@ -165,9 +177,9 @@ class GaussianProcess(tr.PreWhiten):
         """
         testpoint = testpoint.view(-1, 1)
         if self.ndim >= 2:
-            testpoint = tr.PreWhiten.x_transformation(self, testpoint)
+            testpoint = PreWhiten.x_transformation(self, testpoint)
 
-        k_star = kn.compute(self.xtrain, testpoint, self.opt_parameters.data)
+        k_star = compute(self.xtrain, testpoint, self.opt_parameters.data)
         mean = k_star.t() @ self.alpha
         mean = torch.exp(mean * self.ystd + self.ymean)
         return mean.view(-1)
@@ -203,7 +215,9 @@ class GaussianProcess(tr.PreWhiten):
         testpoint.requires_grad = False
         return hess
 
-    def predict_mean_var(self, testpoint: torch.tensor) -> Tuple[torch.tensor, torch.tensor]:
+    def predict_mean_var(
+        self, testpoint: torch.tensor
+    ) -> Tuple[torch.tensor, torch.tensor]:
         """Computes the prediction at a given test point.
 
         Args:
@@ -215,16 +229,16 @@ class GaussianProcess(tr.PreWhiten):
         """
         testpoint = testpoint.view(-1, 1)
         if self.ndim >= 2:
-            testpoint = tr.PreWhiten.x_transformation(self, testpoint)
-        k_star = kn.compute(self.xtrain, testpoint, self.opt_parameters.data)
-        k_star_star = kn.compute(testpoint, testpoint, self.opt_parameters.data)
+            testpoint = PreWhiten.x_transformation(self, testpoint)
+        k_star = compute(self.xtrain, testpoint, self.opt_parameters.data)
+        k_star_star = compute(testpoint, testpoint, self.opt_parameters.data)
 
         # the mean prediction
         mean = k_star.t() @ self.alpha
         mean = torch.exp(mean * self.ystd + self.ymean)
 
         # the variance calculation
-        var = k_star_star - k_star.t() @ kn.solve(self.kernel_matrix, k_star)
+        var = k_star_star - k_star.t() @ solve(self.kernel_matrix, k_star)
         var = (self.ystd * mean) ** 2 * var
         return mean.view(-1), var.view(-1)
 

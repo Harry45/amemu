@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 import scipy.interpolate as itp
+import progressbar
 
 
 def tensor_to_dict(tensor: torch.tensor, keys: list) -> dict:
@@ -180,3 +181,19 @@ def interpolate(inputs: list) -> np.ndarray:
     spline = itp.splrep(x, y)
     ynew = itp.splev(xnew, spline)
     return np.exp(ynew)
+
+
+class MyProgressBar:
+    def __init__(self):
+        self.pbar = None
+
+    def __call__(self, block_num, block_size, total_size):
+        if not self.pbar:
+            self.pbar = progressbar.ProgressBar(maxval=total_size)
+            self.pbar.start()
+
+        downloaded = block_num * block_size
+        if downloaded < total_size:
+            self.pbar.update(downloaded)
+        else:
+            self.pbar.finish()
