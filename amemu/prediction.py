@@ -207,8 +207,12 @@ class EmuPredict:
             gp_mean, gp_var = self.calculate_gp_mean_var(redshift, gp_cosmo)
             pred_pklin_mean = prefactor * gp_mean
             pred_pklin_var = prefactor**2 * gp_var
-            return pred_pklin_mean.numpy(), pred_pklin_var.numpy()
+            pred_pklin_mean = pred_pklin_mean.numpy()
+            pred_pklin_var = pred_pklin_var.numpy()
+            pred_pklin_var[pred_pklin_var < 0.0] = 1e-32
+            return pred_pklin_mean, pred_pklin_var
 
         gp_mean = self.calculate_gp_mean(redshift, gp_cosmo)
         pred_pklin = prefactor * gp_mean
-        return pred_pklin.numpy()
+        pred_pklin = pred_pklin.numpy()
+        return pred_pklin
