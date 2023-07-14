@@ -1,5 +1,9 @@
 """
 Tests for the emulator.
+
+Run the following from the parent folder.
+
+python -m unittest test.test_pklin
 """
 import unittest
 import numpy as np
