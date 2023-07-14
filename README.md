@@ -13,4 +13,19 @@ The inputs to the emulator are the cosmological parameters and redshift.
 ```
 conda create --name amemu python=3.9
 conda activate amemu
+pip install -i https://test.pypi.org/simple/ amemu==0.0.16
+```
+
+## Example
+Git clone the folder amemu from Github:
+
+```
+git clone https://github.com/Harry45/amemu.git
+```
+
+The run the notebook `final.ipynb`
+
+```
+cd amemu/notebook
+jupyter notebook
 ```
