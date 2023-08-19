@@ -180,7 +180,7 @@ class EmuPredict:
         return gp_mean, gp_var
 
     def calculate_pklin(
-        self, redshift: float, cosmo: dict, return_var: bool = False
+        self, redshift: np.ndarray, cosmo: dict, return_var: bool = False
     ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """
         Calculates the final linear matter power spectrum.
