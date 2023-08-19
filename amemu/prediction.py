@@ -86,7 +86,7 @@ class EmuPredict:
         nlhs (int, optional): The number of Latin Hypercube samples used. Defaults to 500.
     """
 
-    def __init__(self, nlhs: int = 500, download: bool = True):
+    def __init__(self, nlhs= 500, download = True):
         self.config = CONFIG
         self.priors = generate_cosmo_prior()
         self.gps = load_gps(nlhs, CONFIG.MODEL_LINK, download)
@@ -94,7 +94,7 @@ class EmuPredict:
             np.log10(self.config.K_MIN), np.log10(self.config.K_MAX), self.config.NWAVE
         )
 
-    def check_prior(self, redshift: float, parameter: dict) -> None:
+    def check_prior(self, redshift, parameter):
         """
         Check the prior of the parameters (and redshift) and print a message if either is outside the box.
 
@@ -109,7 +109,7 @@ class EmuPredict:
         if not np.isfinite(logprior):
             print("Parameter is outside prior box. Unreliable predictions expected.")
 
-    def calculate_prefactor(self, parameter: torch.tensor) -> torch.tensor:
+    def calculate_prefactor(self, parameter):
         """
         Calculate the prefactor in terms of sigma8 and n_s.
 
@@ -126,7 +126,7 @@ class EmuPredict:
         prefactor = pre_sigma8 * pre_ns
         return prefactor
 
-    def calculate_gp_mean(self, redshift: float, parameter: dict) -> torch.tensor:
+    def calculate_gp_mean(self, redshift, parameter):
         """
         Calculate the mean of the GP. Note that the GP is built on top of:
         1) redshift
@@ -153,9 +153,7 @@ class EmuPredict:
         )
         return pred
 
-    def calculate_gp_mean_var(
-        self, redshift: float, parameter: dict
-    ) -> Tuple[torch.tensor, torch.tensor]:
+    def calculate_gp_mean_var(self, redshift, parameter):
         """
         Calculate BOTH the mean and the variance using the GP. Note that the GP is built on top of:
         1) redshift
@@ -179,9 +177,7 @@ class EmuPredict:
         gp_mean, gp_var = preds[0].view(-1), preds[1].view(-1)
         return gp_mean, gp_var
 
-    def calculate_pklin(
-        self, redshift: np.ndarray, cosmo: dict, return_var: bool = False
-    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    def calculate_pklin(self, redshift, cosmo, return_var: bool):
         """
         Calculates the final linear matter power spectrum.
 
@@ -191,7 +187,7 @@ class EmuPredict:
             return_var (bool, optional): return the variance prediction on the linear Pk. Defaults to False.
 
         Returns:
-            Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]: mean or (mean and variance) of the linear Pk.
+            mean or (mean and variance) of the linear Pk.
         """
         gp_cosmo = {
             "Omega_cdm": cosmo["Omega_cdm"],
